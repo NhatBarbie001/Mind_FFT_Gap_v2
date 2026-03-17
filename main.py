@@ -135,7 +135,7 @@ def run_class_incremental(cfg, device):
         with torch.no_grad():
             for inputs, targets, t in val_gap_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
-                outputs = model(inputs)
+                outputs = model(inputs, _cur_task=task_id)
 
                 one_hot_targets = torch.nn.functional.one_hot(targets, outputs.shape[1]).float()
                 positive_outputs.append((outputs * one_hot_targets).sum(dim=1).mean())
@@ -192,7 +192,7 @@ def run_class_incremental(cfg, device):
                 # targets = targets - targets_bais
                 inputs, targets = inputs.to(device), targets.to(device)
 
-                outputs =  model(inputs)
+                outputs =  model(inputs, _cur_task=task_id)
                 # image_f, text_f = model(inputs, return_feature=True)
                 if task_id >0:
                     if cfg.real_replay:
@@ -259,7 +259,7 @@ def run_class_incremental(cfg, device):
                     torch.cuda.empty_cache()
 
                     inputs, targets = inputs.to(device), targets.to(device)
-                    outputs =  model(inputs)
+                    outputs =  model(inputs, _cur_task=task_id)
                     # image_f, text_f = model(inputs, return_feature=True)
                     loss_c = torch.nn.functional.cross_entropy(outputs, targets)
                     loss += loss_c
@@ -314,7 +314,7 @@ def run_class_incremental(cfg, device):
                     inputs, targets = inputs.to(device), targets.to(device)
                     # pdb.set_trace()
                     with torch.no_grad():
-                        outputs, _ = model(inputs, return_feature=True)
+                        outputs, _ = model(inputs, _cur_task=task_id, return_feature=True)
                     # pdb.set_trace()
                     outputs = vision_clsf(outputs)
                     # pdb.set_trace()
@@ -346,7 +346,7 @@ def run_class_incremental(cfg, device):
 
                         inputs, targets = inputs.to(device), targets.to(device)
                         with torch.no_grad():
-                            outputs, _ = model(inputs, return_feature=True)
+                            outputs, _ = model(inputs, _cur_task=task_id, return_feature=True)
                         # pdb.set_trace()
                         outputs = vision_clsf(outputs)
                         loss_c = torch.nn.functional.cross_entropy(outputs, targets)
@@ -380,7 +380,7 @@ def run_class_incremental(cfg, device):
                     a = 1
                     b = 4
                     
-                    outputs, image_feature, text_feature  = model(inputs, test=True, all_test=cfg.all_test, return_feature=True)
+                    outputs, image_feature, text_feature  = model(inputs, _cur_task=task_id, test=True, all_test=cfg.all_test, return_feature=True)
                     vision_outputs = vision_clsf(image_feature)
 
                     outputs_softmax = F.softmax(outputs, dim=1)
@@ -396,7 +396,7 @@ def run_class_incremental(cfg, device):
                         if l == p:
                             correct_per_class[label] += 1
                 else:
-                    outputs = model(inputs, test=True, all_test=cfg.all_test)
+                    outputs = model(inputs, _cur_task=task_id, test=True, all_test=cfg.all_test)
                     metric_logger.add([outputs.cpu().argmax(dim=1), targets.cpu(), task_ids], subset="test")
         class_acc = {}
         for clas in total_per_class:
@@ -446,7 +446,7 @@ def run_domain_incremental(cfg, device):
         eval_loader = DataLoader(dataset_val, batch_size=cfg.batch_size)
         for input, target, task_ids in tqdm(eval_loader):
             input, target = input.to(device), target.to(device)
-            output = torch.from_numpy(model(input))
+            output = torch.from_numpy(model(input, _cur_task=task_id)).to(device)
             logger.add([output.cpu().argmax(dim=1), target.cpu(), task_ids], subset='test')
 
         with open(cfg.log_path, 'a+') as f:

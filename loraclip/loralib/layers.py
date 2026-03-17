@@ -361,7 +361,8 @@ class MultiheadAttention(nn.Module):
     bias_k: Optional[torch.Tensor]
     bias_v: Optional[torch.Tensor]
 
-    def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None, lora_alpha: int = 1, r=0, only_kv=False,mlp=False):
+    def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None, lora_alpha: int = 1, r=0, only_kv=False,mlp=False
+                 , n_tasks=10, n_frq=3000):
         super(MultiheadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -465,6 +466,7 @@ class MultiheadAttention(nn.Module):
         self.add_zero_attn = add_zero_attn
 
         #--------------FFT heree----------------
+        self.n_frq = n_frq
         self.coef_k = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
         self.coef_v = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
         self.indices = [self.select_pos(t, self.embed_dim).to(self.device) for t in range(n_tasks)]
@@ -562,7 +564,7 @@ class MultiheadAttention(nn.Module):
         super(MultiheadAttention, self).__setstate__(state)
 
     def forward(self, query, key, value, key_padding_mask=None,
-                need_weights=True, attn_mask=None):
+                need_weights=True, attn_mask=None, _cur_task: int=-1):
         # type: (Tensor, Tensor, Tensor, Optional[Tensor], bool, Optional[Tensor]) -> Tuple[Tensor, Optional[Tensor]]
         r"""
     Args:
@@ -714,7 +716,7 @@ def multi_head_attention_forward(query: Tensor,
                                  only_kv: bool = False,
                                  mlp: bool = False,
                                  delta_w_k: Optional[Tensor] = None,
-                                 delta_v_k: Optional[Tensor] = None
+                                 delta_w_v: Optional[Tensor] = None
                                  ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
     Args:
