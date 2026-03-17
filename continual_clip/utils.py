@@ -36,7 +36,7 @@ def save_config(config: DictConfig) -> None:
 
 def get_workdir(path):
     split_path = path.split("/")
-    workdir_idx = split_path.index("MindtheGap")
+    workdir_idx = split_path.index("Mind_FFT_Gap_v2")
     return "/".join(split_path[:workdir_idx+1])
 
 
