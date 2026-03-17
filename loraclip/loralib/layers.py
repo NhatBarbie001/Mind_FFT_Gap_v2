@@ -362,7 +362,7 @@ class MultiheadAttention(nn.Module):
     bias_v: Optional[torch.Tensor]
 
     def __init__(self, embed_dim, num_heads, dropout=0., bias=True, add_bias_kv=False, add_zero_attn=False, kdim=None, vdim=None, lora_alpha: int = 1, r=0, only_kv=False,mlp=False
-                 , n_tasks=10, n_frq=3000):
+                 , n_tasks=10, n_frq=3000, device=torch.device("cuda" if torch.cuda.is_available() else "cpu")):
         super(MultiheadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -467,6 +467,7 @@ class MultiheadAttention(nn.Module):
 
         #--------------FFT heree----------------
         self.n_frq = n_frq
+        self.device = device
         self.coef_k = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
         self.coef_v = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
         self.indices = [self.select_pos(t, self.embed_dim).to(self.device) for t in range(n_tasks)]
