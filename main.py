@@ -4,6 +4,7 @@ import json
 import pdb
 import hydra
 import logging
+from loraclip.loralib.layers import MultiheadAttention
 from omegaconf import DictConfig
 
 import torch
@@ -74,6 +75,9 @@ def run_class_incremental(cfg, device):
 
     cfg.class_order = utils.get_class_order(os.path.join(cfg.workdir, cfg.class_order))
     model = load_model(cfg, device)
+    for module in model.modules():
+            if isinstance(module, MultiheadAttention):
+                module.init_param()
 
     eval_dataset, classes_names = build_cl_scenarios(
         cfg, is_train=False, transforms=model.transforms
@@ -105,9 +109,37 @@ def run_class_incremental(cfg, device):
             memory_size=2000,
             herding_method="random"
         )
-    for name, p in model.named_parameters():
-        if p.requires_grad:
-            print("Trainable:", name)
+    # for name, p in model.named_parameters():
+    #     if p.requires_grad:
+    #         print("Trainable:", name)
+    for name, param in model.named_parameters():
+            param.requires_grad_(False)
+            try:
+                if "classifier_pool" + "." + str(model.module.numtask - 1) in name:
+                    param.requires_grad_(True)
+                if "coef_k" + "." + str(model.module.numtask - 1) in name:
+                    param.requires_grad_(True)
+                if "coef_v" + "." + str(model.module.numtask - 1) in name:
+                    param.requires_grad_(True)
+            except:
+                if "classifier_pool" + "." + str(model.numtask - 1) in name:
+                    param.requires_grad_(True)
+                if "coef_k" + "." + str(model.numtask - 1) in name:
+                    param.requires_grad_(True)
+                if "coef_v" + "." + str(model.numtask - 1) in name:
+                    param.requires_grad_(True)
+    # Double check
+    enabled = set()
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            enabled.add(name)
+    with torch.no_grad():
+            for i, (_, inputs, targets) in enumerate(train_loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                model(inputs, get_cur_feat=True)
+
+    print(f"Parameters to be updated: {enabled}")
+    
     for task_id, _ in enumerate(eval_dataset):
 
         # negative_records = 0
