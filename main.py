@@ -130,17 +130,17 @@ def run_class_incremental(cfg, device):
                         param.requires_grad_(True)
                     if "coef_v" + "." + str(task_id) in name:
                         param.requires_grad_(True)
-    # Double check
-    enabled = set()
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            enabled.add(name)
-    with torch.no_grad():
-            for i, (_, inputs, targets) in enumerate(train_loader):
-                inputs, targets = inputs.to(device), targets.to(device)
-                model(inputs, get_cur_feat=True)
+    # # Double check
+    # enabled = set()
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         enabled.add(name)
+    # with torch.no_grad():
+    #         for i, (_, inputs, targets) in enumerate(train_loader):
+    #             inputs, targets = inputs.to(device), targets.to(device)
+    #             model(inputs, get_cur_feat=True)
 
-    print(f"Parameters to be updated: {enabled}")
+    # print(f"Parameters to be updated: {enabled}")
 
     for task_id, _ in enumerate(eval_dataset):
 
