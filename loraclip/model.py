@@ -228,12 +228,12 @@ class LoRAResidualAttentionBlock(nn.Module):
         self.ln_2 = LayerNorm(d_model)
         self.attn_mask = attn_mask
 
-    def attention(self, x: torch.Tensor):
+    def attention(self, x: torch.Tensor, cur_task:int=-1):
         self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
-        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
+        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask, _cur_task=cur_task)[0]
 
-    def forward(self, x: torch.Tensor):
-        x = x + self.attention(self.ln_1(x))
+    def forward(self, x: torch.Tensor, _cur_task:int=-1):
+        x = x + self.attention(self.ln_1(x), cur_task=_cur_task)
         if self.mlp_flag:
             x = x + self.adapter_mlp(self.ln_2(x)) + self.mlp(self.ln_2(x))
         else:
@@ -258,9 +258,14 @@ class LoRATransformer(nn.Module):
         super().__init__()
         self.width = width
         self.layers = layers
-        self.resblocks = nn.Sequential(*[LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp) for _ in range(layers)])
+        # self.resblocks = nn.Sequential(*[LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp) for _ in range(layers)])
 
-    def forward(self, x: torch.Tensor):
+        self.resblocks = nn.ModuleList([
+            LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp, n_frq=n_frq, n_tasks=n_tasks, device=device)
+            for _ in range(layers)
+        ])
+        
+    def forward(self, x: torch.Tensor,_cur_task:int=-1):
         return self.resblocks(x)
 
 
@@ -322,7 +327,7 @@ class LoRAVisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, _cur_task:int=-1):
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
@@ -331,7 +336,7 @@ class LoRAVisionTransformer(nn.Module):
         x = self.ln_pre(x)
 
         x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.transformer(x)
+        x = self.transformer(x, _cur_task=_cur_task)
         x = x.permute(1, 0, 2)  # LND -> NLD
 
         x = self.ln_post(x[:, 0, :])
@@ -508,6 +513,7 @@ class LoRACLIP(nn.Module):
             vision_heads = vision_width // 64
             
             if "vision" in lora_mode:
+                print("=========== creating LoRA Vision Transformer==========")
                 self.visual = LoRAVisionTransformer(
                     input_resolution=image_resolution,
                     patch_size=vision_patch_size,
@@ -530,6 +536,7 @@ class LoRACLIP(nn.Module):
                 )
 
         if "text" in lora_mode:
+            print("=========== creating LoRA Text Transformer==========")
             self.transformer = LoRATransformer(
                 width=transformer_width,
                 layers=transformer_layers,
@@ -612,10 +619,10 @@ class LoRACLIP(nn.Module):
     def dtype(self):
         return self.visual.conv1.weight.dtype
 
-    def encode_image(self, image):
+    def encode_image(self, image, _cur_task:int=-1):
         return self.visual(image.type(self.dtype))
 
-    def encode_text(self, text):
+    def encode_text(self, text, _cur_task:int=-1):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
 
         x = x + self.positional_embedding.type(self.dtype)
@@ -631,9 +638,9 @@ class LoRACLIP(nn.Module):
         x = self.lora_text_projection(x)
         return x
 
-    def forward(self, image, text):
-        image_features = self.encode_image(image)
-        text_features = self.encode_text(text)
+    def forward(self, image, _cur_task:int=-1, text):
+        image_features = self.encode_image(image, _cur_task=_cur_task)
+        text_features = self.encode_text(text, _cur_task=_cur_task)
 
         # normalized features
         image_features = image_features / image_features.norm(dim=1, keepdim=True)

@@ -464,8 +464,44 @@ class MultiheadAttention(nn.Module):
 
         self.add_zero_attn = add_zero_attn
 
-        self._reset_parameters()
+        #--------------FFT heree----------------
+        self.coef_k = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
+        self.coef_v = nn.ParameterList([nn.Parameter(torch.randn(self.n_frq), requires_grad=True) for _ in range(n_tasks)]).to(self.device)
+        self.indices = [self.select_pos(t, self.embed_dim).to(self.device) for t in range(n_tasks)]
+        self.init_param()
+        #---------------------------------------
 
+        self._reset_parameters()
+    #================================================================
+    def init_param(self):
+        for t in range(len(self.coef_k)):
+            nn.init.zeros_(self.coef_k[t])
+        for t in range(len(self.coef_v)):
+            nn.init.zeros_(self.coef_v[t])
+    
+    def select_pos(self, t, dim, seed=777):
+        indices = torch.randperm(dim * dim, generator=torch.Generator().manual_seed(seed+t*10))[:self.n_frq]
+        indices = torch.stack([indices // dim, indices % dim], dim=0)
+        return indices
+    
+    def get_delta_w_k(self, task, alpha=300):
+        device = self.coef_k[task].device
+
+        indices = self.indices[task]
+        # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
+        F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
+        F[indices[0,:], indices[1,:]] =  self.coef_k[task]
+        return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
+    
+    def get_delta_w_v(self, task, alpha=300):
+        device = self.coef_v[task].device
+
+        indices = self.indices[task]
+        # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
+        F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
+        F[indices[0,:], indices[1,:]] =  self.coef_v[task]
+        return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
+    #================================================================
     def _reset_parameters(self):
         if self._qkv_same_embed_dim:
             if self.only_kv and not self.mlp:
@@ -590,6 +626,9 @@ class MultiheadAttention(nn.Module):
                 #     key_padding_mask=key_padding_mask, need_weights=need_weights,
                 #     attn_mask=attn_mask)
                 print("------------(only_kv and not mlp) mode in forward------------")
+                delta_w_k = self.get_delta_w_k(_cur_task)
+                delta_w_v = self.get_delta_w_v(_cur_task)
+
                 return multi_head_attention_forward(
                     query, key, value, self.embed_dim, self.num_heads,
                     self.in_proj_weight, self.in_proj_bias, self.in_proj_weight_lora_A, self.in_proj_weight_lora_B, self.scaling,
@@ -602,7 +641,9 @@ class MultiheadAttention(nn.Module):
                     q_proj_weight_A=self.q_proj_weight_lora_A, k_proj_weight_A=self.k_proj_weight_lora_A, v_proj_weight_A=self.v_proj_weight_lora_A,
                     q_proj_weight_B=self.q_proj_weight_lora_B, k_proj_weight_B=self.k_proj_weight_lora_B, v_proj_weight_B=self.v_proj_weight_lora_B,
                     q_proj_weight_scaling=self.scaling, k_proj_weight_scaling=self.scaling, v_proj_weight_scaling=self.scaling,
-                    only_kv=True
+                    only_kv=True,
+                    delta_w_k=delta_w_k,
+                    delta_w_v=delta_w_v 
                 )
             elif self.mlp:
                 print("------------mlp mode in forward------------")
@@ -671,7 +712,9 @@ def multi_head_attention_forward(query: Tensor,
                                  static_k: Optional[Tensor] = None,
                                  static_v: Optional[Tensor] = None,
                                  only_kv: bool = False,
-                                 mlp: bool = False
+                                 mlp: bool = False,
+                                 delta_w_k: Optional[Tensor] = None,
+                                 delta_v_k: Optional[Tensor] = None
                                  ) -> Tuple[Tensor, Optional[Tensor]]:
     r"""
     Args:
@@ -834,8 +877,10 @@ def multi_head_attention_forward(query: Tensor,
                 v = linear(value, v_proj_weight_non_opt, in_proj_bias)
 
             # q += linear(linear(query, q_proj_weight_non_opt_A), q_proj_weight_non_opt_B) * q_proj_weight_scaling
-            k += linear(linear(key, k_proj_weight_non_opt_A), k_proj_weight_non_opt_B) * k_proj_weight_scaling
-            v += linear(linear(value, v_proj_weight_non_opt_A), v_proj_weight_non_opt_B) * v_proj_weight_scaling
+            # k += linear(linear(key, k_proj_weight_non_opt_A), k_proj_weight_non_opt_B) * k_proj_weight_scaling
+            # v += linear(linear(value, v_proj_weight_non_opt_A), v_proj_weight_non_opt_B) * v_proj_weight_scaling
+            k += linear(key, delta_w_k) * k_proj_weight_scaling
+            v += linear(value, delta_w_v) * v_proj_weight_scaling
 
             pass
         elif mlp:
