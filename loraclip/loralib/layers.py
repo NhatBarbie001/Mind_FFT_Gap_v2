@@ -487,38 +487,64 @@ class MultiheadAttention(nn.Module):
         indices = torch.stack([indices // dim, indices % dim], dim=0)
         return indices
     
+    # def get_delta_w_k(self, task, alpha=300):
+    #     device = self.coef_k[task].device
+
+    #     indices = self.indices[task]
+    #     # # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
+    #     # F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
+    #     # F[indices[0,:], indices[1,:]] =  self.coef_k[task]
+
+    #     F = torch.zeros(self.embed_dim * self.embed_dim, device=device)
+
+    #     flat_indices = indices[0] * self.embed_dim + indices[1]
+
+    #     F = F.scatter(0, flat_indices, self.coef_k[task])
+
+    #     F = F.view(self.embed_dim, self.embed_dim)
+    #     return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
     def get_delta_w_k(self, task, alpha=300):
         device = self.coef_k[task].device
+        indices = self.indices[task]  # (2, n_frq)
+        values = self.coef_k[task]
 
-        indices = self.indices[task]
-        # # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
-        # F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
-        # F[indices[0,:], indices[1,:]] =  self.coef_k[task]
+        F = torch.sparse_coo_tensor(
+            indices,
+            values,
+            (self.embed_dim, self.embed_dim),
+            device=device
+        ).to_dense()
 
-        F = torch.zeros(self.embed_dim * self.embed_dim, device=device)
-
-        flat_indices = indices[0] * self.embed_dim + indices[1]
-
-        F = F.scatter(0, flat_indices, self.coef_k[task])
-
-        F = F.view(self.embed_dim, self.embed_dim)
-        return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
+        return torch.fft.ifft2(F, dim=(-2, -1)).real * alpha
     
+    # def get_delta_w_v(self, task, alpha=300):
+    #     device = self.coef_v[task].device
+
+    #     indices = self.indices[task]
+    #     # # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
+    #     # F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
+    #     # F[indices[0,:], indices[1,:]] =  self.coef_v[task]
+    #     F = torch.zeros(self.embed_dim * self.embed_dim, device=device)
+
+    #     flat_indices = indices[0] * self.embed_dim + indices[1]
+
+    #     F = F.scatter(0, flat_indices, self.coef_v[task])
+
+    #     F = F.view(self.embed_dim, self.embed_dim)
+    #     return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
     def get_delta_w_v(self, task, alpha=300):
         device = self.coef_v[task].device
+        indices = self.indices[task]  # (2, n_frq)
+        values = self.coef_v[task]
 
-        indices = self.indices[task]
-        # # F = torch.zeros(self.dim, self.dim).to(self.qkv.weight.device)
-        # F = torch.zeros(self.embed_dim, self.embed_dim).to(device)
-        # F[indices[0,:], indices[1,:]] =  self.coef_v[task]
-        F = torch.zeros(self.embed_dim * self.embed_dim, device=device)
+        F = torch.sparse_coo_tensor(
+            indices,
+            values,
+            (self.embed_dim, self.embed_dim),
+            device=device
+        ).to_dense()
 
-        flat_indices = indices[0] * self.embed_dim + indices[1]
-
-        F = F.scatter(0, flat_indices, self.coef_v[task])
-
-        F = F.view(self.embed_dim, self.embed_dim)
-        return torch.fft.ifft2(F, dim=(-2,-1)).real * alpha
+        return torch.fft.ifft2(F, dim=(-2, -1)).real * alpha
     #================================================================
     def _reset_parameters(self):
         if self._qkv_same_embed_dim:
