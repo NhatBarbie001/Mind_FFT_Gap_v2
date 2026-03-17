@@ -212,8 +212,8 @@ def run_class_incremental(cfg, device):
                 loss += loss_c
                 optimizer.zero_grad()
                 #==================================================
-                print("loss.requires_grad:", loss.requires_grad)
-                print("loss.grad_fn:", loss.grad_fn)
+                # print("loss.requires_grad:", loss.requires_grad)
+                # print("loss.grad_fn:", loss.grad_fn)
                 #==================================================
                 loss.backward()
                 optimizer.step()
