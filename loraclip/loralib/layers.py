@@ -395,6 +395,7 @@ class MultiheadAttention(nn.Module):
             self.register_parameter('in_proj_weight_lora_B', None)
         else:
             if only_kv and not mlp:
+                print("------------(only_kv and not mlp) mode------------")
                 self.q_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
                 self.k_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
                 self.v_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
@@ -411,6 +412,7 @@ class MultiheadAttention(nn.Module):
                 self.register_parameter('in_proj_weight_lora_B', None)
                 pass
             elif mlp:
+                print("------------mlp mode------------")
                 self.q_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
                 self.k_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
                 self.v_proj_weight = nn.Parameter(torch.Tensor(embed_dim, embed_dim))
@@ -431,6 +433,7 @@ class MultiheadAttention(nn.Module):
                 self.register_parameter('in_proj_weight_lora_B', None)
                 pass
             else:
+                print("------------default mode------------")
                 self.in_proj_weight = nn.Parameter(torch.empty(3 * embed_dim, embed_dim))
                 self.in_proj_weight_lora_A = nn.Parameter(torch.empty(r, embed_dim))
                 self.in_proj_weight_lora_B = nn.Parameter(torch.empty(3 * embed_dim, r))
@@ -586,6 +589,7 @@ class MultiheadAttention(nn.Module):
                 #     training=self.training,
                 #     key_padding_mask=key_padding_mask, need_weights=need_weights,
                 #     attn_mask=attn_mask)
+                print("------------(only_kv and not mlp) mode in forward------------")
                 return multi_head_attention_forward(
                     query, key, value, self.embed_dim, self.num_heads,
                     self.in_proj_weight, self.in_proj_bias, self.in_proj_weight_lora_A, self.in_proj_weight_lora_B, self.scaling,
@@ -601,6 +605,7 @@ class MultiheadAttention(nn.Module):
                     only_kv=True
                 )
             elif self.mlp:
+                print("------------mlp mode in forward------------")
                 return multi_head_attention_forward(
                     query, key, value, self.embed_dim, self.num_heads,
                     self.in_proj_weight, self.in_proj_bias, self.in_proj_weight_lora_A, self.in_proj_weight_lora_B, self.scaling,
@@ -615,6 +620,7 @@ class MultiheadAttention(nn.Module):
                 )
 
             else:
+                print("------------default mode in forward------------")
                 return multi_head_attention_forward(
                     query, key, value, self.embed_dim, self.num_heads,
                     self.in_proj_weight, self.in_proj_bias, self.in_proj_weight_lora_A, self.in_proj_weight_lora_B, self.scaling,
