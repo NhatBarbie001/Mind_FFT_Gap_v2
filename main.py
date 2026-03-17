@@ -105,6 +105,9 @@ def run_class_incremental(cfg, device):
             memory_size=2000,
             herding_method="random"
         )
+    for name, p in model.named_parameters():
+        if p.requires_grad:
+            print("Trainable:", name)
     for task_id, _ in enumerate(eval_dataset):
 
         # negative_records = 0
@@ -208,6 +211,10 @@ def run_class_incremental(cfg, device):
                     loss_c = torch.nn.functional.cross_entropy(outputs, targets) 
                 loss += loss_c
                 optimizer.zero_grad()
+                #==================================================
+                print("loss.requires_grad:", loss.requires_grad)
+                print("loss.grad_fn:", loss.grad_fn)
+                #==================================================
                 loss.backward()
                 optimizer.step()
                 if bach_i % 10 == 0:
