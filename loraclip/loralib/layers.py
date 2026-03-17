@@ -646,7 +646,8 @@ class MultiheadAttention(nn.Module):
                 # print("----------------------")
                 delta_w_k = self.get_delta_w_k(_cur_task)
                 delta_w_v = self.get_delta_w_v(_cur_task)
-
+                print("delta_w_k.requires_grad:", delta_w_k.requires_grad)
+                print("coef_k.requires_grad:", self.coef_k[_cur_task].requires_grad)
                 return multi_head_attention_forward(
                     query, key, value, self.embed_dim, self.num_heads,
                     self.in_proj_weight, self.in_proj_bias, self.in_proj_weight_lora_A, self.in_proj_weight_lora_B, self.scaling,
