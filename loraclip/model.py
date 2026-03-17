@@ -268,7 +268,7 @@ class LoRATransformer(nn.Module):
     def forward(self, x: torch.Tensor,_cur_task:int=-1):
         for block in self.resblocks:
             x = block(x, _cur_task=_cur_task)
-        return self.resblocks(x)
+        return x
 
 
 class VisionTransformer(nn.Module):
