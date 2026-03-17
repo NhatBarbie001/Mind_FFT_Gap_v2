@@ -628,7 +628,7 @@ class MultiheadAttention(nn.Module):
                 #     training=self.training,
                 #     key_padding_mask=key_padding_mask, need_weights=need_weights,
                 #     attn_mask=attn_mask)
-                print("------------(only_kv and not mlp) mode in forward------------")
+                # print("----------------------")
                 delta_w_k = self.get_delta_w_k(_cur_task)
                 delta_w_v = self.get_delta_w_v(_cur_task)
 
