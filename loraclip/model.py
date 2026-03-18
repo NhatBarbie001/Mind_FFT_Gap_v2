@@ -258,17 +258,18 @@ class LoRATransformer(nn.Module):
         super().__init__()
         self.width = width
         self.layers = layers
-        # self.resblocks = nn.Sequential(*[LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp) for _ in range(layers)])
+        self.resblocks = nn.Sequential(*[LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp) for _ in range(layers)])
 
-        self.resblocks = nn.ModuleList([
-            LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp, n_tasks=n_tasks)
-            for _ in range(layers)
-        ])
+        # self.resblocks = nn.ModuleList([
+        #     LoRAResidualAttentionBlock(width, heads, attn_mask, r=r, only_kv=only_kv, mlp=mlp, n_tasks=n_tasks)
+        #     for _ in range(layers)
+        # ])
 
     def forward(self, x: torch.Tensor,_cur_task:int=-1):
-        for block in self.resblocks:
-            x = block(x, _cur_task=_cur_task)
-        return x
+        # for block in self.resblocks:
+        #     x = block(x, _cur_task=_cur_task)
+        # return x
+        return self.resblocks(x)
 
 
 class VisionTransformer(nn.Module):
